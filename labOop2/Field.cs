@@ -227,7 +227,7 @@ namespace labOop2
             Console.WriteLine("");
             Console.WriteLine("Статистика игр: ");
             string insert = String.Format("INSERT INTO Games (Name, Steps, State) VALUES ('{0}', {1}, '{2}')", name, steps, "Fail");
-            string select = "Select * from Games";
+            string select = "Select * from Games ORDER BY State DESC, Steps";
             using (SqlConnection connection = new SqlConnection(connectionString))
             {
                 connection.Open();
