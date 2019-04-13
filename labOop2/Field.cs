@@ -10,6 +10,7 @@ namespace labOop2
     [JsonObject(MemberSerialization.OptIn)]
     public class Field
     {
+        private object locker = new object();
         [JsonProperty]
         public int Height;
         [JsonProperty]
@@ -89,7 +90,7 @@ namespace labOop2
                 {
                     Element v = gameField[i, j];
                     Console.ForegroundColor = v.Color;
-                    Console.SetCursorPosition(v.Y, v.X);
+                    Console.SetCursorPosition(j, i);
                     Console.WriteLine(v.Icon);
                 }
             }
@@ -166,14 +167,6 @@ namespace labOop2
             f.FillInGameField();
             return f;
         }
-
-        //public void GenerateTeleport()
-        //{
-        //    int x = 2, y = 2;
-        //    int x1 = Width - 2, y1 = Height - 2;
-        //    gameField[x, y] = new Teleport(x, y);
-        //    gameField[x1, y1] = new Teleport(x1, y1);
-        //}
         public void GeneratePlayer(int x, int y, int l)
         {
             player = new Player(x, y, l);
@@ -186,26 +179,29 @@ namespace labOop2
             int count = 0;
             while (true)
             {
-                Console.CursorVisible = false;
-                foreach (var c in gameField)
+                lock (locker)
                 {
-                    if(c is Enemy)
+                    Console.CursorVisible = false;
+                    foreach (var c in gameField)
                     {
-                        int X = c.Y;
-                        int Y = c.X;
-                        c.X += index;
-                        if(gameField[c.X, c.Y] is Player)
+                        if (c is Enemy)
                         {
-                            player.NullLives();                           
+                            int X = c.Y;
+                            int Y = c.X;
+                            c.X += index;
+                            if (gameField[c.X, c.Y] is Player)
+                            {
+                                player.NullLives();
+                                break;
+                            }
+                            gameField[c.X, c.Y] = c;
+                            gameField[Y, X] = new EmptyCell(X, Y);
+                            DrawCell(c.Y, c.X);
+                            DrawCell(X, Y);
                             break;
                         }
-                        gameField[c.X, c.Y] = c;
-                        gameField[Y, X] = new EmptyCell(X, Y);
-                        DrawCell(c.Y, c.X);
-                        DrawCell(X, Y);
-                        break;
                     }
-                }
+                }               
                 count += index; 
                 if(count == 4 || count == 0)
                 {
@@ -252,84 +248,87 @@ namespace labOop2
         }
         public bool MovePlayer(int x, int y)
         {
-            int X = player.X;
-            int Y = player.Y;
-            if (gameField[player.Y + y, player.X + x] is EmptyCell)
+            lock (locker)
             {
-                player.Move(x, y);
-                gameField[player.Y, player.X] = player;
-                gameField[Y, X] = new EmptyCell(X,Y);
-                return true;
-            }
-            else if (gameField[player.Y + y, player.X + x].GetType() == typeof(Trap))
-            {
-
-                player.Move(x, y);
-                player.MinusLives();
-                gameField[player.Y, player.X] = player;
-                gameField[Y, X] = new EmptyCell(X, Y);
-            }
-            else if (gameField[player.Y + y, player.X + x].GetType() == typeof(Enemy))
-            {
-
-                player.Move(x, y);
-                player.NullLives();
-                gameField[player.Y, player.X] = player;
-                gameField[Y, X] = new EmptyCell(X, Y);
-            }
-            else if (gameField[Y + y, X + x].GetType() == typeof(Prize))
-            {
-
-                player.Move(x, y);
-                gameField[player.Y, player.X] = player;
-                gameField[Y, X] = new EmptyCell(X, Y);
-                MinusPrizes();
-                return false;
-            }
-            else if (gameField[Y + y, X + x].GetType() == typeof(MedHelp))
-            {
-
-                player.Move(x, y);
-                gameField[player.Y, player.X] = player;
-                player.PlusLives();
-                gameField[Y, X] = new EmptyCell(X, Y);
-                return false;
-            }
-            else if (gameField[Y+y, X + x].GetType() == typeof(Death))
-            {
-
-                player.Move(x, y);
-                gameField[player.Y, player.X] = player;
-                player.NullLives();
-                gameField[Y, X] = new EmptyCell(X, Y);
-                return false;
-            }
-            else if (gameField[Y + y, X + x].GetType() == typeof(Teleport))
-            {
-
-                if (player.X + x == 3 && player.Y + y == 2)
+                int X = player.X;
+                int Y = player.Y;
+                if (gameField[player.Y + y, player.X + x] is EmptyCell)
                 {
-                    player.Teleport(Width - 3, 4);
                     player.Move(x, y);
                     gameField[player.Y, player.X] = player;
-
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                    return true;
                 }
-                else if (player.Y + y == 4 && player.X + x == Width - 3)
+                else if (gameField[player.Y + y, player.X + x].GetType() == typeof(Trap))
                 {
-                    player.Teleport(3, 2);
+
+                    player.Move(x, y);
+                    player.MinusLives();
+                    gameField[player.Y, player.X] = player;
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                }
+                else if (gameField[player.Y + y, player.X + x].GetType() == typeof(Enemy))
+                {
+
+                    player.Move(x, y);
+                    player.NullLives();
+                    gameField[player.Y, player.X] = player;
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                }
+                else if (gameField[Y + y, X + x].GetType() == typeof(Prize))
+                {
+
                     player.Move(x, y);
                     gameField[player.Y, player.X] = player;
-
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                    MinusPrizes();
+                    return false;
                 }
-                gameField[Y, X] = new EmptyCell(X, Y);
-                return true;
-            }
-            else if (gameField[Y + y, X + x].GetType() == typeof(BreakPoint))
-            {
+                else if (gameField[Y + y, X + x].GetType() == typeof(MedHelp))
+                {
+
+                    player.Move(x, y);
+                    gameField[player.Y, player.X] = player;
+                    player.PlusLives();
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                    return false;
+                }
+                else if (gameField[Y + y, X + x].GetType() == typeof(Death))
+                {
+
+                    player.Move(x, y);
+                    gameField[player.Y, player.X] = player;
+                    player.NullLives();
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                    return false;
+                }
+                else if (gameField[Y + y, X + x].GetType() == typeof(Teleport))
+                {
+
+                    if (player.X + x == 3 && player.Y + y == 2)
+                    {
+                        player.Teleport(Width - 3, 4);
+                        player.Move(x, y);
+                        gameField[player.Y, player.X] = player;
+
+                    }
+                    else if (player.Y + y == 4 && player.X + x == Width - 3)
+                    {
+                        player.Teleport(3, 2);
+                        player.Move(x, y);
+                        gameField[player.Y, player.X] = player;
+
+                    }
+                    gameField[Y, X] = new EmptyCell(X, Y);
+                    return true;
+                }
+                else if (gameField[Y + y, X + x].GetType() == typeof(BreakPoint))
+                {
+                    return false;
+                }
                 return false;
             }
-            return false;
         }
-    }
+    } 
 }
     
